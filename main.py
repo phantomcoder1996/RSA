@@ -4,6 +4,7 @@ import time
 import timeit
 import math
 from matplotlib import pyplot as plt
+from fractions import gcd
 
 
 
@@ -117,6 +118,7 @@ class RSA(object):
 
             self.n = p*q
         phi_n = (p-1)*(q-1)
+        #print("phin , p, q",phi_n,p,q)
 
         self.e,self.d = self.prime_gen.generate_relatively_prime_number(phi_n)
 
@@ -195,10 +197,115 @@ def RSA_efficiency_test():
 
     plt.plot(key_lengths,timing)
     plt.xlabel("key_length")
-    plt.ylabel("time(sec)")
+    plt.ylabel("time (sec)")
     plt.xticks([i for i in range(4,14,2)])
     plt.title("Effect of key length on efficiency of encryption")
     plt.show()
+
+
+class MathUtils():
+    def __init__(self):
+        self.zzzz=""
+
+    def extended_gcd(self,aa, bb):
+        lastremainder, remainder = abs(aa), abs(bb)
+        x, lastx, y, lasty = 0, 1, 1, 0
+        while remainder:
+            lastremainder, (quotient, remainder) = remainder, divmod(lastremainder, remainder)
+            x, lastx = lastx - quotient * x, x
+            y, lasty = lasty - quotient * y, y
+        return lastremainder, lastx * (-1 if aa < 0 else 1), lasty * (-1 if bb < 0 else 1)
+
+    def modinv(self,a, m):
+        g, x, y = self.extended_gcd(a, m)
+        if g != 1:
+            raise ValueError
+        return x % m
+
+
+
+class Attack(object):
+    def __init__(self):
+        self.key_lengths = [i for i in range(4, 14, 2)]
+        self.timing = []
+        self.m = 390
+        pg = prime_generator()
+        self.m_RSA = RSA(pg)
+        self.get_private_key()
+        self.choosen_cipher_text_attack()
+
+    def getPrimes(self,n):
+
+
+        c = int(math.sqrt(n))
+        primes = []
+        #print(c)
+        if c%2==0:
+            c = c+1
+        for i in range(c,-1, -1):
+            #print(i, n % i)
+            if n % i == 0:
+                primes.append(i)
+                break
+        p = primes[0]
+        q = n / p
+        phin = (p - 1) * (q - 1)
+
+        return p, q, phin
+
+    def get_private_key(self):
+        MU = MathUtils()
+        for kl in self.key_lengths:
+            self.m_RSA.generate_assymetric_key(key_length=kl)
+            n, e = self.m_RSA.get_public_key()
+            _, dpr = self.m_RSA.get_private_key()
+            start = time.time()
+            p, q, phin = self.getPrimes(n)
+            #print('Extracted phin ,p,q', phin, p, q)
+            d = MU.modinv( e,phin)
+            #print("Extraced Key VS Original Key", d, dpr)
+
+            end = time.time()
+            self.timing.append(end - start)
+        plt.plot(self.key_lengths, self.timing)
+        plt.xlabel("key_length")
+        plt.ylabel("time(sec)")
+        plt.xticks([i for i in range(4, 14, 2)])
+        plt.title("Time to get Private Key.")
+        plt.show()
+
+    def get_message(self,c1, c2, e1, e2, N):
+        if gcd(e1, e2) != 1:
+            raise ValueError("e1 and e2 must be coprime")
+        s1 = modinv(e1, e2)
+        s2 = (gcd(e1, e2) - e1 * s1) / e2
+        temp = modinv(c2, N)
+        m1 = pow(c1, s1, N)
+        m2 = pow(temp, -s2, N)
+        return (m1 * m2) % N
+
+    def choosen_cipher_text_attack(self):
+        self.m_RSA.generate_assymetric_key(key_length = 10)
+        n, e = self.m_RSA.get_public_key()
+        m = 390
+
+        C = self.m_RSA.encrypt(m, e, n)
+        C_a = pow(2, e, n)
+        C_b = C * C_a
+        _, dpr = self.m_RSA.get_private_key()
+        C_b_d = self.m_RSA.decrypt(C_b, dpr, n)
+        MU = MathUtils()
+        two_inverse = MU.modinv(2, n)
+        restored_message = (C_b_d* two_inverse) % n
+        print ('Restored Message VS Original Message',restored_message,m)
+        # get C_b_d
+        # ciper sent = (2M)^e mod n
+        # C_b_d = (C_b)^d mod n = (2M) mod n
+
+
+
+
+
 
 
 
@@ -213,6 +320,9 @@ if __name__ == '__main__':
     #2 - Encryption efficiency
     RSA_efficiency_test()
     #3 - Brute force attack
+    attack = Attack()
+
+
 
     #4 - Chosen cipher text attack
 
