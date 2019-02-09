@@ -8,6 +8,15 @@ from matplotlib import pyplot as plt
 
 
 
+def extended_euclidean(a,b):
+        if a == 0 :
+            return b,0,1
+        gcd,x1,y1 = extended_euclidean(b%a,a)
+        x = y1 - (b//a)*x1
+        y = x1
+        return gcd,x,y
+
+
 class prime_generator(object):
 
 
@@ -45,13 +54,6 @@ class prime_generator(object):
 
 
 
-    def extended_euclidean(self,a,b):
-        if a == 0 :
-            return b,0,1
-        gcd,x1,y1 = self.extended_euclidean(b%a,a)
-        x = y1 - (b//a)*x1
-        y = x1
-        return gcd,x,y
 
 
     def generate_relatively_prime_number(self,n):
@@ -60,8 +62,8 @@ class prime_generator(object):
         cnt = 0
 
         while m_gcd != 1:
-            e = random.randint(5,n-1) #start from 5 because less than that the public key will be very small
-            m_gcd,d,_ = self.extended_euclidean(e,n)
+            e = random.randint(3,n-1) #start from 5 because less than that the public key will be very small
+            m_gcd,d,_ = extended_euclidean(e,n)
             cnt = cnt + 1
 
 
@@ -107,11 +109,13 @@ class RSA(object):
         l = key_length//2
         lower_bound = self._fast_exponentiation(10,l-1)
         upper_bound = self._fast_exponentiation(10,l)
-        large_primes = self.prime_gen.get_large_primes(lower_bound,upper_bound)
+        self.n = 0
+        while len(str(self.n))!=key_length:
+            large_primes = self.prime_gen.get_large_primes(lower_bound,upper_bound)
 
-        p,q = self.generate_2_distinct_primes(large_primes)
+            p,q = self.generate_2_distinct_primes(large_primes)
 
-        self.n = p*q
+            self.n = p*q
         phi_n = (p-1)*(q-1)
 
         self.e,self.d = self.prime_gen.generate_relatively_prime_number(phi_n)
@@ -163,15 +167,15 @@ def RSA_simulation(message):
     print("Alice receives the cipher text %s"%c)
     n,d = m_RSA.get_private_key()
     print("Alice decrypts the message using her private key(%d,%d)"%(n,d))
-    m = m_RSA.decrypt(c,d,n)
-    print("Alice restores the message m = %d"%m)
+    m2 = m_RSA.decrypt(c,d,n)
+    print("Alice restores the message m = %d"%m2)
 
 
 def RSA_efficiency_test():
     #Test the effect of n on RSA time
     key_lengths = [i for i in range(4,14,2)]
     timing = []
-    m = 39020
+    m = 390
 
     # #use a constant e = 17 with different lengths of n
     # e = 17
