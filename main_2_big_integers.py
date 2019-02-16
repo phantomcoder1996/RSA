@@ -9,6 +9,7 @@ from fractions import gcd
 
 
 
+
 class MathUtils(object):
     def __init__(self):
         self.zzzz=""
@@ -43,6 +44,70 @@ class MathUtils(object):
 class prime_generator(object):
 
 
+    # miller rabin test
+    def miller_test(self,n,r):
+
+        a = random.randint(2,n-2)
+        x = pow(a,r,n)
+
+
+        if x == 1 or x == n-1:
+            return True
+        while r != n-1:
+
+            break
+            r = r << 1
+            x = (x * x) % n
+            if x == 1 :
+                return False
+            if x == n-1:
+                return True
+        return False
+
+
+
+
+    def is_prime(self,n,k=128):
+        if n == 2 or n == 3 :
+            return True
+        if n<=1 or n&1 == 0 :
+            return False
+        else:
+
+            r = n - 1 #even initially
+            # get r and s such that n-1 = r * 2^s and r is odd
+
+            s = 0
+            while r&1 != 1: # r is not add
+                s = s+1
+                r  = r >> 1
+
+        # based on desired accuracy (perform test k times)
+            for i in range(k):
+
+                if (self.miller_test(n,r)== False): #n is composite
+                    return False
+
+            return True #n is probably prime
+
+
+
+    def generate_large_prime(self,bit_length):
+
+        x = random.getrandbits(bit_length)
+        x |= (1 << (bit_length-1))| 1
+
+        while not self.is_prime(x,128):
+            x = random.getrandbits(bit_length)
+            x |= (1<< (bit_length-1))| 1
+        return x
+
+
+
+
+
+
+
 
 
 
@@ -74,7 +139,6 @@ class prime_generator(object):
     def __init__(self):
         self.primes = []
         self.mu = MathUtils()
-        self._sieve_prime_generator(1000000)
 
 
 
@@ -93,8 +157,10 @@ class prime_generator(object):
             cnt = cnt + 1
 
 
+
         while d < 0:
             d = d + n
+        d = d%n
 
         return e,d
 
@@ -107,14 +173,30 @@ class RSA(object):
     def __init__(self,m_prime_generator):
         self.prime_gen = m_prime_generator
 
-    def _modulo_fast_exponentiation(self,a,b,n):
+    def _modulo_fast_exponentiation_rec(self,a,b,n):
         if b == 1:
             return a
         if b == 0:
             return 1
-        x = self._modulo_fast_exponentiation(a,b//2,n)
+        x = self._modulo_fast_exponentiation_rec(a,b//2,n)
 
         return (x*x)%n if b&1 == 0 else (x*x*a)%n
+
+
+    def _modulo_fast_exponentiation(self,a,b,n): #a^b%n
+
+        res = 1
+        x = a
+        while b>0:
+            if b&1 == 1:
+                res = (res * x)%n
+
+            b = b >> 1
+            x =( x * x )%n
+
+        return res%n
+
+
 
     def _fast_exponentiation(self,a,b):
         if b == 1:
@@ -133,20 +215,20 @@ class RSA(object):
 
     def generate_assymetric_key(self,key_length):
         l = key_length//2
-        lower_bound = self._fast_exponentiation(10,l-1)
-        upper_bound = self._fast_exponentiation(10,l)
-        self.n = 0
-        large_primes = self.prime_gen.get_large_primes(lower_bound,upper_bound)
-        while len(str(self.n))!=key_length:
-
-
-            p,q = self.generate_2_distinct_primes(large_primes)
-
+        p = self.prime_gen.generate_large_prime(l)
+        q = self.prime_gen.generate_large_prime(l)
+        self.n = p*q
+        while int.bit_length(self.n) !=key_length:
+            p = self.prime_gen.generate_large_prime(l)
+            q = self.prime_gen.generate_large_prime(l+1)
             self.n = p*q
+
+        print("p=%d,q=%d"%(p,q))
         phi_n = (p-1)*(q-1)
         #print("phin , p, q",phi_n,p,q)
 
         self.e,self.d = self.prime_gen.generate_relatively_prime_number(phi_n)
+
 
     def get_public_key(self):
         return self.n,self.e
@@ -169,7 +251,7 @@ def RSA_simulation(message):
 
     # Alice generates public and private keys
     print("Alice generates public and private keys")
-    m_RSA.generate_assymetric_key(key_length=10)
+    m_RSA.generate_assymetric_key(key_length=512)
 
 
     '''
@@ -201,9 +283,9 @@ def RSA_simulation(message):
 
 def RSA_efficiency_test():
     #Test the effect of n on RSA time
-    key_lengths = [i for i in range(4,14,2)]
+    key_lengths = [int(pow(2,i)) for i in range(3,11)]
     timing = []
-    m = 390
+    m = 50
 
     # #use a constant e = 17 with different lengths of n
     # e = 17
@@ -214,7 +296,8 @@ def RSA_efficiency_test():
 
         m_RSA.generate_assymetric_key(key_length=kl)
         n,e = m_RSA.get_public_key()
-        print("n=%d"%n)
+        print("n=%d , length in bits=%d "%(n,int.bit_length(n)))
+
         start = time.time()
         _ = m_RSA.encrypt(m,e,n)
         end = time.time()
@@ -222,9 +305,9 @@ def RSA_efficiency_test():
 
 
     plt.plot(key_lengths,timing)
-    plt.xlabel("key_length (digits)")
+    plt.xlabel("key_length (bits)")
     plt.ylabel("time (sec)")
-    plt.xticks([i for i in range(4,14,2)])
+    plt.xticks(key_lengths)
     plt.title("Effect of key length on efficiency of encryption")
     plt.show()
 
@@ -236,7 +319,7 @@ def RSA_efficiency_test():
 
 class Attack(object):
     def __init__(self):
-        self.key_lengths = [i for i in range(4, 14, 2)]
+        self.key_lengths = [int(pow(2,i)) for i in range(2,7)]
         self.timing = []
         #self.m = 390
         pg = prime_generator()
@@ -268,7 +351,7 @@ class Attack(object):
         p = primes[0]
         q = n / p
         phin = (p - 1) * (q - 1)
-
+        print("p=%d ,q=%d from get primes"%(p,q))
         return p, q, phin
 
     def get_private_key(self):
@@ -281,15 +364,20 @@ class Attack(object):
             start = time.time()
             p, q, phin = self.getPrimes(n)
             #print('Extracted phin ,p,q', phin, p, q)
-            d = int(MU.modinv( e,phin))
+            gcd,d,_ = MU.extended_euclidean(e,phin)
+            # d = int(MU.modinv( e,phin))
+            while d<0:
+                d = d+ phin
+
+            d = d%phin
             print("Extraced Key VS Original Key", d, dpr)
 
             end = time.time()
             self.timing.append(end - start)
         plt.plot(self.key_lengths, self.timing)
-        plt.xlabel("key_length (digits)")
+        plt.xlabel("key_length (bits)")
         plt.ylabel("time(sec)")
-        plt.xticks([i for i in range(4, 14, 2)])
+        plt.xticks( self.key_lengths)
         plt.title("Time to get Private Key.")
         plt.show()
 
@@ -304,9 +392,9 @@ class Attack(object):
         return (m1 * m2) % N
 
     def choosen_cipher_text_attack(self):
-        self.m_RSA.generate_assymetric_key(key_length = 10)
+        self.m_RSA.generate_assymetric_key(key_length = 128)
         n, e = self.m_RSA.get_public_key()
-        m = 50435673
+        m = 504356
 
         C = self.m_RSA.encrypt(m, e, n)
 
@@ -341,7 +429,7 @@ class Attack(object):
 if __name__ == '__main__':
 
     #1 - RSA Simulation
-    RSA_simulation(201)
+    RSA_simulation(250) #message = 25
     #2 - Encryption efficiency
     RSA_efficiency_test()
     #3 - Brute force attack &&  #4 - Chosen cipher text attack
