@@ -348,8 +348,9 @@ class Attack(object):
             if n % i == 0:
                 primes.append(i)
                 break
-        p = primes[0]
-        q = n / p
+        p = int(float((primes[0])))
+        q = int(float((n / p)))
+
         phin = (p - 1) * (q - 1)
         print("p=%d ,q=%d from get primes"%(p,q))
         return p, q, phin
@@ -363,9 +364,10 @@ class Attack(object):
             _, dpr = self.m_RSA.get_private_key()
             start = time.time()
             p, q, phin = self.getPrimes(n)
-            #print('Extracted phin ,p,q', phin, p, q)
+            print('Extracted phin ,p,q', phin, p, q)
+
             gcd,d,_ = MU.extended_euclidean(e,phin)
-            # d = int(MU.modinv( e,phin))
+            #d = int(float((MU.modinv( e,phin))))
             while d<0:
                 d = d+ phin
 
