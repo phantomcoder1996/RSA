@@ -227,7 +227,9 @@ class RSA(object):
         phi_n = (p-1)*(q-1)
         #print("phin , p, q",phi_n,p,q)
 
+
         self.e,self.d = self.prime_gen.generate_relatively_prime_number(phi_n)
+        print("generated e and d = %d %d"%(self.e,self.d))
 
 
     def get_public_key(self):
@@ -361,16 +363,18 @@ class Attack(object):
             n, e = self.m_RSA.get_public_key()
 
             _, dpr = self.m_RSA.get_private_key()
+
             start = time.time()
             p, q, phin = self.getPrimes(n)
+            #print("gcd in attack = %d  "%math.gcd(e,phin))
             #print('Extracted phin ,p,q', phin, p, q)
             gcd,d,_ = MU.extended_euclidean(e,phin)
-            # d = int(MU.modinv( e,phin))
+            #d = int(MU.modinv( e,phin))
             while d<0:
                 d = d+ phin
 
             d = d%phin
-            print("Extraced Key VS Original Key", d, dpr)
+
 
             end = time.time()
             self.timing.append(end - start)
