@@ -39,6 +39,11 @@ class MathUtils(object):
         y = x1
         return gcd,x,y
 
+    def generate_random_number(self,bl):
+        x = random.getrandbits(bl)
+        x |= (1<<(bl-1)) | 1
+        return x
+
 
 
 class prime_generator(object):
@@ -164,6 +169,25 @@ class prime_generator(object):
 
         return e,d
 
+    def generate_relatively_prime_number_of_length(self,n,bl):
+
+            m_gcd = 0
+            cnt = 0
+            MU = MathUtils()
+
+            while m_gcd != 1:
+                e = MU.generate_random_number(bl)
+                m_gcd,d,_ = self.mu.extended_euclidean(e,n)
+                cnt = cnt + 1
+
+
+
+            while d < 0:
+                d = d + n
+            d = d%n
+
+            return e,d
+
 
 
 
@@ -238,12 +262,48 @@ class RSA(object):
     def get_private_key(self):
         return self.n,self.d
 
+    # def encrypt(self,m,e,n):
+    #     #Assume dividing the message into blocks of 8 bits each so that n must be greater than 255
+    #     cipher = []
+    #     for character in m:
+    #          c= self._modulo_fast_exponentiation(int(ord(character)),e,n)
+    #
+    #          cipher.append(c)
+    #
+    #     return cipher
+    #
+    # def decrypt(self,c,d,n):
+    #     recovered_plain_text = ""
+    #     for digit in c:
+    #       print(digit)
+    #       recovered_plain_text = recovered_plain_text + chr(self._modulo_fast_exponentiation(digit,d,n))
+    #     return recovered_plain_text
+
+
     def encrypt(self,m,e,n):
-        return self._modulo_fast_exponentiation(m,e,n)
+        #Assume the ascii string is a number in the base 256, so to get that number
+
+        #first convert the string to number assume the first character to be the most significant
+        number = 0
+
+        for character in m:
+            number = number*256 + int(ord(character))
+
+        c= self._modulo_fast_exponentiation(number,e,n)
+
+
+
+        return c
 
     def decrypt(self,c,d,n):
-        return self._modulo_fast_exponentiation(c,d,n)
+        recovered_plain_text = ""
+        p = self._modulo_fast_exponentiation(c,d,n)
+        while p!=0:
+            recovered_plain_text = recovered_plain_text+chr(p%256)
+            p//=256
 
+        recovered_plain_text= recovered_plain_text[::-1]
+        return recovered_plain_text
 
 
 
@@ -253,7 +313,7 @@ def RSA_simulation(message):
 
     # Alice generates public and private keys
     print("Alice generates public and private keys")
-    m_RSA.generate_assymetric_key(key_length=512)
+    m_RSA.generate_assymetric_key(key_length=1024)
 
 
     '''
@@ -280,14 +340,14 @@ def RSA_simulation(message):
     n,d = m_RSA.get_private_key()
     print("Alice decrypts the message using her private key(%d,%d)"%(n,d))
     m2 = m_RSA.decrypt(c,d,n)
-    print("Alice restores the message m = %d"%m2)
+    print("Alice restores the message m = %s"%m2)
 
 
 def RSA_efficiency_test():
     #Test the effect of n on RSA time
-    key_lengths = [int(pow(2,i)) for i in range(3,11)]
+    key_lengths = [int(pow(2,i)) for i in range(4,11)]
     timing = []
-    m = 50
+    m = "he"
 
     # #use a constant e = 17 with different lengths of n
     # e = 17
@@ -312,6 +372,31 @@ def RSA_efficiency_test():
     plt.xticks(key_lengths)
     plt.title("Effect of key length on efficiency of encryption")
     plt.show()
+
+
+    # Testing the effect of changing e and keeping n constant
+
+    key_lengths = [int(pow(2,i)) for i in range(3,10)]
+    timing=[]
+    pg = prime_generator()
+    p = pg.generate_large_prime(512)
+    q = pg.generate_large_prime(512)
+    n = p*q
+    phi_n = (p-1)*(q-1)
+    for kl in key_lengths:
+        e,_ = pg.generate_relatively_prime_number_of_length(phi_n,kl)
+        print("e=%d",e)
+        start = time.time()
+        _ = m_RSA.encrypt(m,e,n)
+        end = time.time()
+        timing.append(end-start)
+    plt.plot(key_lengths,timing)
+    plt.xlabel("key_length (bits)")
+    plt.ylabel("time (sec)")
+    plt.xticks(key_lengths)
+    plt.title("Effect of length of e on efficiency of encryption at constant n")
+    plt.show()
+
 
 
 
@@ -350,8 +435,9 @@ class Attack(object):
             if n % i == 0:
                 primes.append(i)
                 break
-        p = primes[0]
-        q = n / p
+        p = int(float((primes[0])))
+        q = int(float((n / p)))
+
         phin = (p - 1) * (q - 1)
         print("p=%d ,q=%d from get primes"%(p,q))
         return p, q, phin
@@ -366,15 +452,33 @@ class Attack(object):
 
             start = time.time()
             p, q, phin = self.getPrimes(n)
-            #print("gcd in attack = %d  "%math.gcd(e,phin))
-            #print('Extracted phin ,p,q', phin, p, q)
+
+            print('Extracted phin ,p,q', phin, p, q)
+
+            #
+            # gcd,d,_ = MU.extended_euclidean(e,phin)
+            #
+            # #d = int(MU.modinv( e,phin))
+            #
+            # # d = int(MU.modinv( e,phin))
+            #
+            # d = int(float(d))
+
             gcd,d,_ = MU.extended_euclidean(e,phin)
-            #d = int(MU.modinv( e,phin))
+            #d = int(float((MU.modinv( e,phin))))
             while d<0:
                 d = d+ phin
 
             d = d%phin
 
+
+
+            while d<0:
+                d = d+ phin
+
+            d = d%phin
+
+            print("original vs extracted %d %d"%(dpr,d))
 
             end = time.time()
             self.timing.append(end - start)
@@ -396,9 +500,9 @@ class Attack(object):
         return (m1 * m2) % N
 
     def choosen_cipher_text_attack(self):
-        self.m_RSA.generate_assymetric_key(key_length = 128)
+        self.m_RSA.generate_assymetric_key(key_length = 1024)
         n, e = self.m_RSA.get_public_key()
-        m = 504356
+        m = "504"
 
         C = self.m_RSA.encrypt(m, e, n)
 
@@ -413,6 +517,7 @@ class Attack(object):
         # Restore the message again
         MU = MathUtils()
         two_inverse = MU.modinv(2, n)
+
         restored_message = (C_b_d* two_inverse) % n
         print ('Restored Message VS Original Message',restored_message,m)
         # get C_b_d
@@ -433,7 +538,7 @@ class Attack(object):
 if __name__ == '__main__':
 
     #1 - RSA Simulation
-    RSA_simulation(250) #message = 25
+    RSA_simulation("250") #message = 25
     #2 - Encryption efficiency
     RSA_efficiency_test()
     #3 - Brute force attack &&  #4 - Chosen cipher text attack
